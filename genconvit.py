@@ -17,27 +17,27 @@ from video_dataset import VideoFrameDataModule, create_video_transforms, analyze
 class AutoEncoder(nn.Module):
     def __init__(self, latent_dim=256):
         super().__init__()
-        # encoder for 128x128 input
+        # encoder for 224x224 input
         self.enc = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, 1),  # 128x128 -> 64x64
+            nn.Conv2d(3, 64, 4, 2, 1),  # 224x224 -> 112x112
             nn.ReLU(),
-            nn.Conv2d(64, 128, 4, 2, 1),  # 64 -> 32
+            nn.Conv2d(64, 128, 4, 2, 1),  # 112 -> 56
             nn.ReLU(),
-            nn.Conv2d(128, 256, 4, 2, 1),  # 32 -> 16
+            nn.Conv2d(128, 256, 4, 2, 1),  # 56 -> 28
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(256*16*16, latent_dim)  # Fixed for 128x128 input
+            nn.Linear(256*28*28, latent_dim)  # Fixed for 224x224 input
         )
-        # decoder for 128x128 output
+        # decoder for 224x224 output
         self.dec = nn.Sequential(
-            nn.Linear(latent_dim, 256*16*16),  # Fixed for 128x128 output
-            nn.Unflatten(1, (256, 16, 16)),
+            nn.Linear(latent_dim, 256*28*28),  # Fixed for 224x224 output
+            nn.Unflatten(1, (256, 28, 28)),
             nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 16 -> 32
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 28 -> 56
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),   # 32 -> 64
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),   # 56 -> 112
             nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),     # 64 -> 128
+            nn.ConvTranspose2d(64, 3, 4, 2, 1),     # 112 -> 224
             nn.Sigmoid()
         )
 
@@ -49,28 +49,28 @@ class AutoEncoder(nn.Module):
 class VariationalAutoEncoder(nn.Module):
     def __init__(self, latent_dim=256):
         super().__init__()
-        # encoder for 128x128 input
+        # encoder for 224x224 input
         self.conv = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, 1),   # 128 -> 64
+            nn.Conv2d(3, 64, 4, 2, 1),   # 224 -> 112
             nn.ReLU(),
-            nn.Conv2d(64, 128, 4, 2, 1), # 64 -> 32
+            nn.Conv2d(64, 128, 4, 2, 1), # 112 -> 56
             nn.ReLU(),
-            nn.Conv2d(128, 256, 4, 2, 1), # 32 -> 16
+            nn.Conv2d(128, 256, 4, 2, 1), # 56 -> 28
             nn.ReLU(),
             nn.Flatten()
         )
-        self.fc_mu = nn.Linear(256*16*16, latent_dim)      # Fixed for 128x128 input
-        self.fc_logvar = nn.Linear(256*16*16, latent_dim)  # Fixed for 128x128 input
-        # decoder for 128x128 output
-        self.dec_fc = nn.Linear(latent_dim, 256*16*16)     # Fixed for 128x128 output
+        self.fc_mu = nn.Linear(256*28*28, latent_dim)      # Fixed for 224x224 input
+        self.fc_logvar = nn.Linear(256*28*28, latent_dim)  # Fixed for 224x224 input
+        # decoder for 224x224 output
+        self.dec_fc = nn.Linear(latent_dim, 256*28*28)     # Fixed for 224x224 output
         self.dec_conv = nn.Sequential(
-            nn.Unflatten(1, (256, 16, 16)),
+            nn.Unflatten(1, (256, 28, 28)),
             nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 16 -> 32
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 28 -> 56
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),   # 32 -> 64
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),   # 56 -> 112
             nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),     # 64 -> 128
+            nn.ConvTranspose2d(64, 3, 4, 2, 1),     # 112 -> 224
             nn.Sigmoid()
         )
 
@@ -138,8 +138,8 @@ def train(args):
     print(f"Using device: {device}")
     
     # Create data module with video frame support
-    train_transform = create_video_transforms(input_size=128, augment=True)
-    val_transform = create_video_transforms(input_size=128, augment=False)
+    train_transform = create_video_transforms(input_size=224, augment=True)
+    val_transform = create_video_transforms(input_size=224, augment=False)
     
     data_module = VideoFrameDataModule(
         data_dir=args.data,
