@@ -5,9 +5,11 @@ from pathlib import Path
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader\ Pluginsestion
+from torch.utils.data import DataLoader
 from torchvision import transforms, datasets
 import timm
+
+from video_dataset import VideoFrameDataModule, create_video_transforms, analyze_dataset
 
 # ====================
 # Model Definitions
@@ -133,22 +135,50 @@ def vae_loss(recon_x, x, mu, logvar):
 # ====================
 def train(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    # data
-    mean = [0.485, 0.456, 0.406]
-    std = [0.229, 0.224, 0.225]
-    transform = transforms.Compose([
-        transforms.Resize((128,128)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean, std)
-    ])
-    train_ds = datasets.ImageFolder(os.path.join(args.data, 'train'), transform)
-    val_ds = datasets.ImageFolder(os.path.join(args.data, 'val'), transform)
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=4)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=4)
+    print(f"Using device: {device}")
+    
+    # Create data module with video frame support
+    train_transform = create_video_transforms(input_size=128, augment=True)
+    val_transform = create_video_transforms(input_size=128, augment=False)
+    
+    data_module = VideoFrameDataModule(
+        data_dir=args.data,
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        train_transform=train_transform,
+        val_transform=val_transform,
+        frames_per_video=args.frames_per_video,
+        balanced_sampling=args.balanced_sampling
+    )
+    
+    # Setup datasets
+    data_module.setup('fit')
+    
+    # Get dataloaders
+    train_loader = data_module.train_dataloader()
+    val_loader = data_module.val_dataloader()
+    
+    # Print dataset statistics
+    if data_module.train_dataset:
+        train_stats = analyze_dataset(data_module.train_dataset)
+        print(f"Training dataset: {train_stats['total_samples']} samples, {train_stats['num_classes']} classes")
+        print(f"Class distribution: {train_stats['class_distribution']}")
+        print(f"Average frames per video: {train_stats['avg_frames_per_video']:.2f}")
+    
+    if data_module.val_dataset:
+        val_stats = analyze_dataset(data_module.val_dataset)
+        print(f"Validation dataset: {val_stats['total_samples']} samples")
 
-    model = GenConViT().to(device)
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # Get number of classes from data module
+    num_classes = data_module.get_num_classes()
+    print(f"Number of classes: {num_classes}")
+    
+    model = GenConViT(num_classes=num_classes).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()
+    
+    # Learning rate scheduler
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=args.lr_step, gamma=args.lr_gamma)
 
     best_acc = 0.0
     for epoch in range(1, args.epochs+1):
@@ -169,14 +199,30 @@ def train(args):
             preds = logits.argmax(dim=1)
             correct += (preds == labels).sum().item()
             total += labels.size(0)
+        
         train_acc = correct / total
         avg_loss = total_loss / total
         val_acc = evaluate(model, val_loader, device)
-        print(f"Epoch {epoch}: Loss {avg_loss:.4f}, Train Acc {train_acc:.4f}, Val Acc {val_acc:.4f}")
+        
+        # Step scheduler
+        scheduler.step()
+        current_lr = scheduler.get_last_lr()[0]
+        
+        print(f"Epoch {epoch}: Loss {avg_loss:.4f}, Train Acc {train_acc:.4f}, Val Acc {val_acc:.4f}, LR {current_lr:.6f}")
+        
         if val_acc > best_acc:
             best_acc = val_acc
-            torch.save(model.state_dict(), args.save_path)
-    print(f"Best Val Acc: {best_acc:.4f}")
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'best_acc': best_acc,
+                'class_names': data_module.get_class_names()
+            }, args.save_path)
+            print(f"New best model saved with validation accuracy: {best_acc:.4f}")
+    
+    print(f"Training completed! Best Val Acc: {best_acc:.4f}")
 
 
 def evaluate(model, loader, device):
@@ -197,28 +243,75 @@ def evaluate(model, loader, device):
 # CLI
 # ====================
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--data', type=str, required=True, help='data root with train/val folders')
-    parser.add_argument('--batch-size', type=int, default=32)
-    parser.add_argument('--epochs', type=int, default=20)
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--beta', type=float, default=1.0, help='weight for VAE loss')
-    parser.add_argument('--save-path', type=str, default='genconvit.pth')
-    parser.add_argument('--mode', choices=['train', 'eval'], default='train')
+    parser = argparse.ArgumentParser(description='GenConViT Training for Video Frame DeepFake Detection')
+    parser.add_argument('--data', type=str, required=True, 
+                       help='Data root directory with train/val/test folders or extracted frames')
+    parser.add_argument('--batch-size', type=int, default=32,
+                       help='Batch size for training (default: 32)')
+    parser.add_argument('--epochs', type=int, default=20,
+                       help='Number of training epochs (default: 20)')
+    parser.add_argument('--lr', type=float, default=1e-4,
+                       help='Learning rate (default: 1e-4)')
+    parser.add_argument('--weight-decay', type=float, default=1e-5,
+                       help='Weight decay for regularization (default: 1e-5)')
+    parser.add_argument('--lr-step', type=int, default=7,
+                       help='Learning rate decay step size (default: 7)')
+    parser.add_argument('--lr-gamma', type=float, default=0.5,
+                       help='Learning rate decay factor (default: 0.5)')
+    parser.add_argument('--beta', type=float, default=1.0, 
+                       help='Weight for VAE loss (default: 1.0)')
+    parser.add_argument('--save-path', type=str, default='genconvit_best.pth',
+                       help='Path to save the best model (default: genconvit_best.pth)')
+    parser.add_argument('--mode', choices=['train', 'eval'], default='train',
+                       help='Mode: train or eval (default: train)')
+    parser.add_argument('--num-workers', type=int, default=4,
+                       help='Number of data loading workers (default: 4)')
+    parser.add_argument('--frames-per-video', type=int, default=None,
+                       help='Number of frames to sample per video (default: None - use all)')
+    parser.add_argument('--balanced-sampling', action='store_true',
+                       help='Use balanced sampling for imbalanced datasets')
+    
     args = parser.parse_args()
+    
     if args.mode == 'train':
         train(args)
     else:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model = GenConViT().to(device)
-        model.load_state_dict(torch.load(args.save_path, map_location=device))
-        # assume eval uses val split
-        transform = transforms.Compose([
-            transforms.Resize((128,128)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])
-        ])
-        val_ds = datasets.ImageFolder(os.path.join(args.data, 'val'), transform)
-        loader = DataLoader(val_ds, batch_size=args.batch_size, num_workers=4)
+        
+        # Load model checkpoint
+        checkpoint = torch.load(args.save_path, map_location=device)
+        
+        # Create data module for evaluation
+        val_transform = create_video_transforms(input_size=128, augment=False)
+        data_module = VideoFrameDataModule(
+            data_dir=args.data,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            val_transform=val_transform,
+            frames_per_video=args.frames_per_video
+        )
+        
+        data_module.setup('test')
+        
+        # Use test data if available, otherwise use validation data
+        if data_module.test_dataset:
+            loader = data_module.test_dataloader()
+            print("Using test dataset for evaluation")
+        else:
+            data_module.setup('fit')  # Setup validation data
+            loader = data_module.val_dataloader()
+            print("Using validation dataset for evaluation")
+        
+        # Create model with correct number of classes
+        num_classes = len(checkpoint.get('class_names', ['fake', 'real']))
+        model = GenConViT(num_classes=num_classes).to(device)
+        
+        # Load model weights
+        if 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"Loaded model from epoch {checkpoint.get('epoch', 'unknown')}")
+        else:
+            model.load_state_dict(checkpoint)
+        
         acc = evaluate(model, loader, device)
         print(f"Evaluation Accuracy: {acc:.4f}")
