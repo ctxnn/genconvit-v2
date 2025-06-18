@@ -188,10 +188,19 @@ def train(args):
         correct = 0
         for imgs, labels in train_loader:
             imgs, labels = imgs.to(device), labels.to(device)
+            
+            # Handle video frames: reshape from [batch, frames, channels, height, width] to [batch*frames, channels, height, width]
+            if len(imgs.shape) == 5:
+                batch_size, num_frames = imgs.shape[0], imgs.shape[1]
+                imgs = imgs.view(-1, imgs.shape[2], imgs.shape[3], imgs.shape[4])
+                # Repeat labels for each frame
+                labels = labels.repeat_interleave(num_frames)
+            
             optimizer.zero_grad()
             logits, la, lb, mu, logvar = model(imgs)
             loss_cls = criterion(logits, labels)
-            loss_vae = vae_loss( model.vae(imgs)[0], imgs, mu, logvar)
+            vae_out, vae_mu, vae_logvar = model.vae(imgs)
+            loss_vae = vae_loss(vae_out, imgs, vae_mu, vae_logvar)
             loss = loss_cls + args.beta * loss_vae
             loss.backward()
             optimizer.step()
@@ -232,6 +241,14 @@ def evaluate(model, loader, device):
     with torch.no_grad():
         for imgs, labels in loader:
             imgs, labels = imgs.to(device), labels.to(device)
+            
+            # Handle video frames: reshape from [batch, frames, channels, height, width] to [batch*frames, channels, height, width]
+            if len(imgs.shape) == 5:
+                batch_size, num_frames = imgs.shape[0], imgs.shape[1]
+                imgs = imgs.view(-1, imgs.shape[2], imgs.shape[3], imgs.shape[4])
+                # Repeat labels for each frame
+                labels = labels.repeat_interleave(num_frames)
+            
             logits, *_ = model(imgs)
             preds = logits.argmax(dim=1)
             correct += (preds == labels).sum().item()
