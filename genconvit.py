@@ -17,27 +17,27 @@ from video_dataset import VideoFrameDataModule, create_video_transforms, analyze
 class AutoEncoder(nn.Module):
     def __init__(self, latent_dim=256):
         super().__init__()
-        # encoder
+        # encoder for 128x128 input
         self.enc = nn.Sequential(
             nn.Conv2d(3, 64, 4, 2, 1),  # 128x128 -> 64x64
             nn.ReLU(),
             nn.Conv2d(64, 128, 4, 2, 1),  # 64 -> 32
             nn.ReLU(),
-            nn.Conv2d(128, 256, 4, 2, 1),
+            nn.Conv2d(128, 256, 4, 2, 1),  # 32 -> 16
             nn.ReLU(),
             nn.Flatten(),
-            nn.Linear(256*32*32, latent_dim)
+            nn.Linear(256*16*16, latent_dim)  # Fixed for 128x128 input
         )
-        # decoder
+        # decoder for 128x128 output
         self.dec = nn.Sequential(
-            nn.Linear(latent_dim, 256*32*32),
-            nn.Unflatten(1, (256, 32, 32)),
+            nn.Linear(latent_dim, 256*16*16),  # Fixed for 128x128 output
+            nn.Unflatten(1, (256, 16, 16)),
             nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 32 -> 64
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 16 -> 32
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),   # 32 -> 64
             nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),
+            nn.ConvTranspose2d(64, 3, 4, 2, 1),     # 64 -> 128
             nn.Sigmoid()
         )
 
@@ -49,28 +49,28 @@ class AutoEncoder(nn.Module):
 class VariationalAutoEncoder(nn.Module):
     def __init__(self, latent_dim=256):
         super().__init__()
-        # encoder
+        # encoder for 128x128 input
         self.conv = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, 1),
+            nn.Conv2d(3, 64, 4, 2, 1),   # 128 -> 64
             nn.ReLU(),
-            nn.Conv2d(64, 128, 4, 2, 1),
+            nn.Conv2d(64, 128, 4, 2, 1), # 64 -> 32
             nn.ReLU(),
-            nn.Conv2d(128, 256, 4, 2, 1),
+            nn.Conv2d(128, 256, 4, 2, 1), # 32 -> 16
             nn.ReLU(),
             nn.Flatten()
         )
-        self.fc_mu = nn.Linear(256*32*32, latent_dim)
-        self.fc_logvar = nn.Linear(256*32*32, latent_dim)
-        # decoder
-        self.dec_fc = nn.Linear(latent_dim, 256*32*32)
+        self.fc_mu = nn.Linear(256*16*16, latent_dim)      # Fixed for 128x128 input
+        self.fc_logvar = nn.Linear(256*16*16, latent_dim)  # Fixed for 128x128 input
+        # decoder for 128x128 output
+        self.dec_fc = nn.Linear(latent_dim, 256*16*16)     # Fixed for 128x128 output
         self.dec_conv = nn.Sequential(
-            nn.Unflatten(1, (256, 32, 32)),
+            nn.Unflatten(1, (256, 16, 16)),
             nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1),
+            nn.ConvTranspose2d(256, 128, 4, 2, 1),  # 16 -> 32
             nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),
+            nn.ConvTranspose2d(128, 64, 4, 2, 1),   # 32 -> 64
             nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),
+            nn.ConvTranspose2d(64, 3, 4, 2, 1),     # 64 -> 128
             nn.Sigmoid()
         )
 
