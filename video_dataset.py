@@ -88,15 +88,15 @@ class VideoFrameDataset(Dataset):
             with open(metadata_file, 'r') as f:
                 self.metadata = json.load(f)
         
+        # Cache for faster loading (must be initialized before building dataset)
+        self._path_cache = {} if cache_paths else None
+        
         # Discover classes and build dataset
         self.class_names = class_names or self._discover_classes()
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.class_names)}
         
         # Build the dataset
         self.samples = self._build_dataset()
-        
-        # Cache for faster loading
-        self._path_cache = {} if cache_paths else None
         
         logger.info(f"Created dataset with {len(self.samples)} samples from {len(self.class_names)} classes")
     
@@ -289,6 +289,9 @@ class BalancedVideoFrameDataset(VideoFrameDataset):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Ensure _path_cache is properly initialized (redundant safety check)
+        if not hasattr(self, '_path_cache'):
+            self._path_cache = {} if kwargs.get('cache_paths', False) else None
         self.sample_weights = self.get_sample_weights()
     
     def get_balanced_sampler(self) -> WeightedRandomSampler:
