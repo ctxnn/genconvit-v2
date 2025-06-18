@@ -176,15 +176,16 @@ class VideoFrameDataset(Dataset):
                             'video_dir': video_dir
                         })
             else:
-                # Structure 2: class_dir contains frames directly
+                # Structure 2: class_dir contains frames directly - treat each frame as a separate sample
                 frames = self._get_video_frames(class_dir)
                 
-                if len(frames) >= self.min_frames_per_video:
+                # Create a separate sample for each frame file
+                for i, frame_path in enumerate(frames):
                     samples.append({
-                        'video_id': class_name,
+                        'video_id': f'{class_name}_frame_{i}',
                         'class_name': class_name,
                         'class_idx': class_idx,
-                        'frames': frames,
+                        'frames': [frame_path],  # Single frame per sample
                         'video_dir': class_dir
                     })
         
