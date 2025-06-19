@@ -11,7 +11,7 @@ BATCH_SIZE=16
 EPOCHS=100
 LR=0.0001
 NUM_WORKERS=4
-SAVE_PATH="./models/genconvit_improved.pth"
+SAVE_PATH="./models/genconvit_v2_single_gpu.pth"
 DROPOUT_RATE=0.5
 AE_LATENT=256
 VAE_LATENT=256
@@ -297,7 +297,7 @@ echo "Number of epochs:             $EPOCHS"
 echo "Learning rate:                $LR"
 echo "Weight decay:                 $WEIGHT_DECAY"
 echo "Number of workers:            $NUM_WORKERS"
-echo "Model save path:              $SAVE_PATH"
+echo "  Model save path:              $SAVE_PATH"
 echo ""
 echo "Model Architecture:"
 echo "  AutoEncoder latent dim:     $AE_LATENT"
@@ -397,8 +397,12 @@ echo ""
 if [ $exit_code -eq 0 ]; then
     print_success "Training completed successfully!"
     print_info "Training time: ${duration} seconds"
-    if [ -f "$SAVE_PATH" ]; then
-        print_success "Best model saved at: $SAVE_PATH"
+    # Check for best model file
+    BEST_MODEL="${SAVE_PATH//.pth/_best.pth}"
+    if [ -f "$BEST_MODEL" ]; then
+        print_success "Best model saved at: $BEST_MODEL"
+    elif [ -f "$SAVE_PATH" ]; then
+        print_success "Model saved at: $SAVE_PATH"
     fi
 
     # Check for results file

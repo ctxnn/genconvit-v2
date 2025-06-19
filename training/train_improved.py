@@ -296,8 +296,14 @@ class ImprovedTrainer:
         
         if is_best:
             best_path = save_path.replace('.pth', '_best.pth')
+            # Also save with timestamp for easier identification
+            import datetime
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamped_path = save_path.replace('.pth', f'_best_{timestamp}.pth')
             torch.save(checkpoint, best_path)
+            torch.save(checkpoint, timestamped_path)
             logger.info(f"New best model saved: {best_path}")
+            logger.info(f"Timestamped best model saved: {timestamped_path}")
     
     def train(self) -> Dict[str, Any]:
         """Main training loop with all improvements"""
@@ -338,6 +344,7 @@ class ImprovedTrainer:
             })
             
             # Check for best model
+            # Save best model
             is_best = val_metrics['accuracy'] > self.best_val_acc
             if is_best:
                 self.best_val_acc = val_metrics['accuracy']
@@ -352,7 +359,13 @@ class ImprovedTrainer:
             
             # Save checkpoint
             if epoch % self.config['save_every'] == 0 or is_best:
-                self.save_checkpoint(epoch, is_best)
+                # Create descriptive checkpoint name for periodic saves
+                if not is_best and epoch % self.config['save_every'] == 0:
+                    checkpoint_name = f"genconvit_v2_single_gpu_epoch_{epoch}.pth"
+                    checkpoint_path = self.config['save_path'].replace('.pth', f'_epoch_{epoch}.pth')
+                    self.save_checkpoint(epoch, is_best, checkpoint_path)
+                else:
+                    self.save_checkpoint(epoch, is_best)
             
             # Early stopping check
             if self.early_stopping(val_metrics['loss'], self.model):
@@ -473,8 +486,8 @@ def main():
                        help='Beta parameter for VAE KL divergence (default: 1.0)')
     
     # Checkpoint arguments
-    parser.add_argument('--save-path', type=str, default='models/genconvit_improved.pth',
-                       help='Path to save the model (default: models/genconvit_improved.pth)')
+    parser.add_argument('--save-path', type=str, default='models/genconvit_v2_single_gpu.pth',
+                       help='Path to save the model (default: models/genconvit_v2_single_gpu.pth)')
     parser.add_argument('--save-every', type=int, default=5,
                        help='Save checkpoint every N epochs (default: 5)')
     parser.add_argument('--resume', type=str, default=None,

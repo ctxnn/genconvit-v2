@@ -11,7 +11,7 @@ BATCH_SIZE=16
 EPOCHS=100
 LR=0.0001
 NUM_WORKERS=4
-SAVE_PATH="./models/genconvit_ddp_improved.pth"
+SAVE_PATH="./models/genconvit_v2_ddp.pth"
 WORLD_SIZE=-1  # Use all available GPUs
 INPUT_SIZE=224
 WEIGHT_DECAY=1e-4
@@ -408,14 +408,18 @@ echo ""
 if [ $exit_code -eq 0 ]; then
     print_success "Improved distributed training completed successfully!"
     print_info "Training time: ${duration} seconds"
-    if [ -f "$SAVE_PATH" ]; then
-        print_success "Best model saved at: $SAVE_PATH"
+    # Check for best model file
+    BEST_MODEL="${SAVE_PATH//.pth/_best.pth}"
+    if [ -f "$BEST_MODEL" ]; then
+        print_success "Best model saved at: $BEST_MODEL"
+    elif [ -f "$SAVE_PATH" ]; then
+        print_success "Model saved at: $SAVE_PATH"
     fi
 
     # Check for results file
     RESULTS_FILE="${SAVE_PATH//.pth/_results.json}"
     if [ -f "$RESULTS_FILE" ]; then
-        print_info "Training results saved to: $RESULTS_FILE"
+            print_info "Training results saved to: $RESULTS_FILE"
     fi
 
     echo ""
