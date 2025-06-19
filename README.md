@@ -1,365 +1,562 @@
-# GenConViT-v2: Video-Based DeepFake Detection
+# GenConViT-v2: Complete Video-Based DeepFake Detection System
 
-A comprehensive deep learning pipeline for detecting deepfake videos using the GenConViT (Generative Convolutional Vision Transformer) architecture. This implementation supports end-to-end training from raw video files to a fully trained deepfake detection model.
+A comprehensive deep learning pipeline for detecting deepfake videos using the GenConViT (Generative Convolutional Vision Transformer) architecture with distributed training and advanced evaluation capabilities.
 
-## 🚀 Features
+## 🚀 **Key Features**
 
-- **End-to-end pipeline**: From raw videos to trained model
-- **Automatic frame extraction**: Supports multiple video formats
-- **Flexible data organization**: Handles various directory structures
-- **Advanced model architecture**: GenConViT with dual-path processing
-- **Data augmentation**: Comprehensive augmentation pipeline
-- **Balanced sampling**: Handles imbalanced datasets
-- **Face detection**: Optional face cropping for better performance
-- **Resume capability**: Continue training from checkpoints
-- **Comprehensive logging**: Detailed progress tracking
+### **Training Options**
+- **🔥 Distributed Training (DDP)**: Multi-GPU training with PyTorch DDP
+- **🖥️ Single GPU Training**: Standard single GPU training
+- **💻 CPU Training**: CPU-only training for systems without GPU
+- **📸 Frame-Based Processing**: Direct training on PNG/JPG frame files
+- **⚡ High Performance**: Optimized data loading and memory usage
+- **💾 Smart Checkpointing**: Auto-save best models and resume training
 
-## 📋 Requirements
+### **Evaluation System**
+- **🎬 Video Processing**: Automatic frame extraction from videos
+- **📈 Advanced Metrics**: ROC curves, confusion matrices, PR curves
+- **📊 Beautiful Visualizations**: Professional graphs and charts
+- **🎯 No-Label Support**: Works with or without ground truth labels
+- **📋 Detailed Reports**: JSON, CSV, and visual outputs
 
-- Python 3.7+
-- CUDA-compatible GPU (recommended)
-- OpenCV
-- PyTorch 1.9+
-- See `requirements.txt` for full dependencies
+### **Model Architecture**
+- **🧠 Dual-Path Design**: AutoEncoder + VAE pathways
+- **🔍 Modern Backbones**: ConvNeXt + Swin Transformer
+- **🎛️ Flexible Configuration**: Customizable architecture parameters
 
-## 🛠️ Installation
+## 📋 **Quick Setup**
 
-1. Clone the repository:
+### **Requirements**
 ```bash
-git clone <repository-url>
+# Install dependencies
+pip install torch torchvision timm opencv-python pillow numpy pandas matplotlib seaborn scikit-learn
+
+# For CPU-only systems (optional)
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+```
+
+### **Data Structure**
+```
+your_data/
+├── train/
+│   ├── real/
+│   │   ├── frame001.png
+│   │   ├── frame002.png
+│   │   └── ...
+│   └── fake/
+│       ├── frame001.png
+│       ├── frame002.png
+│       └── ...
+└── val/
+    ├── real/
+    └── fake/
+```
+
+## 🚀 **Training Options**
+
+### **Option 1: Distributed Training (Multi-GPU) - RECOMMENDED**
+
+#### **Quick Start - Use All GPUs**
+```bash
 cd genconvit-v2
+./launch_ddp.sh --data ./your_data --epochs 50
 ```
 
-2. Install dependencies:
+#### **Custom Multi-GPU Training**
 ```bash
-pip install -r requirements.txt
+./launch_ddp.sh \
+    --data ./your_data \
+    --batch-size 16 \
+    --epochs 100 \
+    --lr 0.0001 \
+    --world-size 2
 ```
 
-3. Verify installation:
+#### **Memory-Efficient Multi-GPU**
 ```bash
-python -c "import torch; print(f'PyTorch version: {torch.__version__}')"
-python -c "import cv2; print(f'OpenCV version: {cv2.__version__}')"
+./launch_ddp.sh \
+    --data ./your_data \
+    --batch-size 4 \
+    --world-size 2 \
+    --num-workers 2
 ```
 
-## 📁 Data Organization
+### **Option 2: Single GPU Training**
 
-### Option 1: Pre-organized by Class
-```
-videos/
-├── real/
-│   ├── video1.mp4
-│   ├── video2.avi
-│   └── ...
-└── fake/
-    ├── video1.mp4
-    ├── video2.mov
-    └── ...
-```
-
-### Option 2: Flat Structure (Auto-detection)
-```
-videos/
-├── real_video1.mp4
-├── fake_video1.mp4
-├── original_video2.avi
-├── deepfake_video2.mp4
-└── ...
-```
-
-The system will automatically detect class names from:
-- Directory structure (Option 1)
-- Filename patterns: `real`, `original`, `genuine` → "real" class
-- Filename patterns: `fake`, `deepfake`, `synthetic` → "fake" class
-
-## 🚀 Quick Start
-
-### Complete Pipeline (Recommended)
-
-Train a model from raw videos in one command:
-
-```bash
-python train_from_videos.py \
-    --video_dir ./videos \
-    --output_dir ./training_output \
-    --epochs 30 \
-    --batch_size 16
-```
-
-### Step-by-Step Approach
-
-#### 1. Extract Frames from Videos
-
-```bash
-python extract_frames.py \
-    --input_dir ./videos \
-    --output_dir ./extracted_frames \
-    --frame_interval 5 \
-    --width 224 \
-    --height 224
-```
-
-#### 2. Train the Model
-
+#### **Basic Single GPU**
 ```bash
 python genconvit.py \
-    --data ./extracted_frames \
-    --batch_size 32 \
-    --epochs 20 \
+    --data ./your_data \
+    --batch-size 16 \
+    --epochs 30 \
     --lr 0.0001 \
     --mode train
 ```
 
-#### 3. Evaluate the Model
-
+#### **Single GPU with Custom Settings**
 ```bash
 python genconvit.py \
-    --data ./extracted_frames \
-    --save_path ./genconvit_best.pth \
-    --mode eval
-```
-
-## 🔧 Advanced Usage
-
-### Frame Extraction Options
-
-```bash
-# Extract every 10th frame with face detection
-python extract_frames.py \
-    --input_dir ./videos \
-    --output_dir ./frames \
-    --frame_interval 10 \
-    --face_detection \
-    --max_frames 100
-
-# Custom resolution and video extensions
-python extract_frames.py \
-    --input_dir ./videos \
-    --output_dir ./frames \
-    --width 128 \
-    --height 128 \
-    --extensions .mp4 .avi .mov
-```
-
-### Training with Custom Parameters
-
-```bash
-# Training with balanced sampling and custom splits
-python train_from_videos.py \
-    --video_dir ./videos \
-    --output_dir ./training_output \
-    --train_split 0.8 \
-    --val_split 0.1 \
-    --test_split 0.1 \
-    --balanced_sampling \
-    --face_detection \
+    --data ./your_data \
+    --batch-size 8 \
     --epochs 50 \
-    --batch_size 16 \
     --lr 0.0001 \
-    --weight_decay 1e-5
+    --weight-decay 1e-5 \
+    --balanced-sampling \
+    --mode train \
+    --save-path ./single_gpu_model.pth
 ```
 
-### Resume Training from Checkpoint
-
+#### **Memory-Constrained Single GPU**
 ```bash
-python train_from_videos.py \
-    --video_dir ./videos \
-    --output_dir ./training_output \
-    --resume_from_checkpoint ./training_output/models/checkpoint_epoch_20.pth \
-    --epochs 50
+python genconvit.py \
+    --data ./your_data \
+    --batch-size 4 \
+    --epochs 30 \
+    --lr 0.0001 \
+    --num-workers 2 \
+    --mode train
 ```
 
-## 📊 Model Architecture
+### **Option 3: CPU Training (No GPU Required)**
 
-GenConViT uses a dual-path architecture:
-
-- **Path A**: AutoEncoder + ConvNeXt + Swin Transformer
-- **Path B**: Variational AutoEncoder + ConvNeXt + Swin Transformer
-- **Fusion**: Combined logits from both paths
-
-### Key Components:
-- **AutoEncoder**: Learns compressed representations
-- **Variational AutoEncoder**: Learns probabilistic representations
-- **ConvNeXt**: Modern CNN backbone
-- **Swin Transformer**: Hierarchical vision transformer
-- **Dual Classification Heads**: Separate processing paths
-
-## 📈 Training Configuration
-
-### Default Parameters
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `batch_size` | 32 | Training batch size |
-| `epochs` | 20 | Number of training epochs |
-| `learning_rate` | 1e-4 | Initial learning rate |
-| `weight_decay` | 1e-5 | L2 regularization |
-| `frame_interval` | 5 | Extract every Nth frame |
-| `target_size` | 224x224 | Frame resolution |
-| `beta` | 1.0 | VAE loss weight |
-
-### Recommended Settings
-
-**For limited GPU memory:**
+#### **Basic CPU Training**
 ```bash
---batch_size 8 --frames_per_video 10
+# Force CPU usage
+CUDA_VISIBLE_DEVICES="" python genconvit.py \
+    --data ./your_data \
+    --batch-size 2 \
+    --epochs 20 \
+    --lr 0.001 \
+    --num-workers 1 \
+    --mode train
 ```
 
-**For large datasets:**
+#### **CPU Training with Optimizations**
 ```bash
---balanced_sampling --max_frames 200
+# Set CPU threads for better performance
+export OMP_NUM_THREADS=4
+CUDA_VISIBLE_DEVICES="" python genconvit.py \
+    --data ./your_data \
+    --batch-size 1 \
+    --epochs 15 \
+    --lr 0.001 \
+    --num-workers 1 \
+    --mode train \
+    --save-path ./cpu_model.pth
 ```
 
-**For high accuracy:**
+### **Training Performance Comparison**
+
+| Setup | Batch Size | Typical Speed | Memory Usage | Recommended For |
+|-------|------------|---------------|--------------|-----------------|
+| **Multi-GPU (4x)** | 32 per GPU | ~4x faster | High | Large datasets, fast training |
+| **Single GPU** | 16-32 | Baseline | Medium | Most use cases |
+| **CPU Only** | 1-4 | ~10x slower | Low | No GPU available, small datasets |
+
+## 📊 **Evaluation & Prediction**
+
+### **Evaluate on Videos (With Labels)**
 ```bash
---face_detection --epochs 50 --lr 0.00005
+./evaluate.sh \
+    --model ./models/genconvit_best.pth \
+    --video-dir ./test_videos \
+    --ground-truth ./labels.csv
 ```
 
-## 📝 Output Structure
-
-After running the complete pipeline:
-
-```
-training_output/
-├── extracted_frames/
-│   ├── train/
-│   │   ├── real/
-│   │   └── fake/
-│   ├── val/
-│   └── test/
-├── models/
-│   ├── best_model.pth
-│   ├── checkpoint_epoch_5.pth
-│   └── checkpoint_epoch_10.pth
-├── logs/
-│   ├── training_pipeline.log
-│   └── frame_extraction.log
-└── pipeline_results.json
-```
-
-## 🎯 Performance Tips
-
-### For Better Accuracy:
-1. Use face detection: `--face_detection`
-2. Increase training epochs: `--epochs 50`
-3. Use balanced sampling: `--balanced_sampling`
-4. Extract more frames: `--frame_interval 3`
-
-### For Faster Training:
-1. Reduce batch size: `--batch_size 16`
-2. Limit frames per video: `--frames_per_video 20`
-3. Use fewer workers: `--num_workers 2`
-4. Lower resolution: `--target_width 128 --target_height 128`
-
-### For Large Datasets:
-1. Use frame sampling: `--max_frames 200`
-2. Enable balanced sampling: `--balanced_sampling`
-3. Increase workers: `--num_workers 8`
-4. Use multiple GPUs if available
-
-## 🐛 Troubleshooting
-
-### Common Issues:
-
-**Out of Memory Error:**
+### **Evaluate on Videos (No Labels)**
 ```bash
-# Reduce batch size and frame count
---batch_size 8 --frames_per_video 10
+./evaluate.sh \
+    --model ./models/genconvit_best.pth \
+    --video-dir ./unknown_videos
 ```
 
-**No videos found:**
-- Check video file extensions
-- Verify directory structure
-- Use `--extensions` to specify formats
+### **CPU Evaluation**
+```bash
+./evaluate.sh \
+    --model ./models/model.pth \
+    --video-dir ./videos \
+    --device cpu \
+    --batch-size 1 \
+    --num-workers 1
+```
 
-**Low accuracy:**
-- Increase training epochs
-- Enable face detection
-- Use data augmentation
-- Check class balance
+### **Custom Evaluation**
+```bash
+./evaluate.sh \
+    --model ./models/model.pth \
+    --video-dir ./videos \
+    --output-dir ./my_results \
+    --frame-interval 10 \
+    --max-frames 30 \
+    --batch-size 16
+```
 
-**Slow training:**
-- Reduce number of workers if CPU-bound
-- Use GPU if available
-- Reduce frame resolution
+## 📝 **Complete Command Reference**
 
-## 📚 API Reference
+### **Training Commands**
 
-### VideoFrameDataset
+| Command | Description | Best For |
+|---------|-------------|----------|
+| `./launch_ddp.sh` | Multi-GPU distributed training | Multiple GPUs available |
+| `python genconvit.py` | Single GPU/CPU training | Single GPU or CPU only |
+| `./launch_ddp.sh --help` | Show distributed training options | - |
+| `python genconvit.py --help` | Show single GPU/CPU options | - |
+
+### **Key Training Parameters**
+
+| Parameter | Multi-GPU Default | Single GPU Default | CPU Default | Description |
+|-----------|------------------|-------------------|-------------|-------------|
+| `--batch-size` | 16 | 16 | 2 | Batch size (per GPU for multi-GPU) |
+| `--epochs` | 50 | 20 | 15 | Number of training epochs |
+| `--lr` | 0.0001 | 0.0001 | 0.001 | Learning rate |
+| `--num-workers` | 4 | 4 | 1 | Data loading workers |
+| `--world-size` | -1 (all GPUs) | N/A | N/A | Number of GPUs to use |
+
+### **Evaluation Parameters**
+
+| Parameter | Description | Default | CPU Recommended |
+|-----------|-------------|---------|-----------------|
+| `--model PATH` | Trained model path | Required | Required |
+| `--video-dir DIR` | Video directory | Required | Required |
+| `--batch-size N` | Prediction batch size | 32 | 1-4 |
+| `--device` | cpu/cuda/auto | auto | cpu |
+| `--frame-interval N` | Extract every Nth frame | 5 | 10 |
+| `--max-frames N` | Max frames per video | 50 | 20 |
+
+## 🎯 **Usage Examples by System Type**
+
+### **🖥️ Multi-GPU System (Recommended)**
+```bash
+# Training
+./launch_ddp.sh \
+    --data ./my_data \
+    --batch-size 32 \
+    --epochs 100 \
+    --world-size 4
+
+# Evaluation
+./evaluate.sh \
+    --model ./models/genconvit_ddp_best.pth \
+    --video-dir ./test_videos \
+    --batch-size 32
+```
+
+### **🔥 Single GPU System**
+```bash
+# Training
+python genconvit.py \
+    --data ./my_data \
+    --batch-size 16 \
+    --epochs 50 \
+    --lr 0.0001 \
+    --balanced-sampling \
+    --mode train
+
+# Evaluation
+./evaluate.sh \
+    --model ./genconvit_best.pth \
+    --video-dir ./test_videos \
+    --batch-size 16
+```
+
+### **💻 CPU-Only System**
+```bash
+# Training (be patient - this takes time!)
+export OMP_NUM_THREADS=4
+CUDA_VISIBLE_DEVICES="" python genconvit.py \
+    --data ./small_dataset \
+    --batch-size 1 \
+    --epochs 10 \
+    --lr 0.001 \
+    --num-workers 1 \
+    --mode train
+
+# Evaluation
+./evaluate.sh \
+    --model ./genconvit_best.pth \
+    --video-dir ./test_videos \
+    --device cpu \
+    --batch-size 1 \
+    --frame-interval 10 \
+    --max-frames 10
+```
+
+### **🚀 Quick Start by Experience Level**
+
+#### **Beginner (Just want it to work)**
+```bash
+# If you have GPU
+python genconvit.py --data ./your_data --mode train
+
+# If you don't have GPU
+CUDA_VISIBLE_DEVICES="" python genconvit.py --data ./your_data --batch-size 1 --mode train
+
+# Evaluate
+./evaluate.sh --model ./genconvit_best.pth --video-dir ./videos
+```
+
+#### **Intermediate (Want good performance)**
+```bash
+# Multi-GPU if available
+./launch_ddp.sh --data ./your_data --batch-size 16 --epochs 50
+
+# Single GPU
+python genconvit.py --data ./your_data --batch-size 16 --epochs 30 --balanced-sampling --mode train
+
+# Evaluate with labels
+./evaluate.sh --model ./models/best.pth --video-dir ./videos --ground-truth ./labels.csv
+```
+
+#### **Advanced (Want full control)**
+```bash
+# Custom multi-GPU training
+./launch_ddp.sh \
+    --data ./data \
+    --batch-size 32 \
+    --epochs 200 \
+    --lr 0.0001 \
+    --weight-decay 1e-5 \
+    --lr-step 50 \
+    --world-size 4 \
+    --save-every 10
+
+# Detailed evaluation
+./evaluate.sh \
+    --model ./models/model.pth \
+    --video-dir ./videos \
+    --ground-truth ./labels.csv \
+    --frame-interval 3 \
+    --max-frames 100 \
+    --output-dir ./detailed_results
+```
+
+## 📊 **Output Files**
+
+### **Training Outputs**
+```
+# Multi-GPU Training
+models/
+├── genconvit_ddp_best.pth          # Best model
+├── checkpoint_epoch_10.pth         # Periodic checkpoints
+└── training_ddp.log                # Training log
+
+# Single GPU Training
+├── genconvit_best.pth              # Best model
+└── training.log                    # Training log
+```
+
+### **Evaluation Outputs**
+```
+evaluation_results/
+├── evaluation_report.json          # Main metrics and statistics
+├── detailed_results.csv            # Per-video predictions
+├── detailed_predictions.json       # Complete prediction data
+├── confusion_matrix.png            # Confusion matrix (if labels provided)
+├── roc_curve.png                   # ROC curve (if labels provided)
+├── precision_recall_curve.png      # PR curve (if labels provided)
+├── confidence_distribution.png     # Confidence score distribution
+└── prediction_distribution.png     # Prediction class distribution
+```
+
+## 🔧 **Troubleshooting**
+
+### **Training Issues**
+
+#### **CUDA Out of Memory**
+```bash
+# Reduce batch size
+--batch-size 4
+
+# Reduce workers
+--num-workers 2
+
+# Use CPU instead
+CUDA_VISIBLE_DEVICES="" python genconvit.py --data ./data --batch-size 1 --mode train
+```
+
+#### **No GPU Available**
+```bash
+# Check GPU
+python -c "import torch; print(torch.cuda.is_available())"
+
+# Force CPU training
+CUDA_VISIBLE_DEVICES="" python genconvit.py --data ./data --batch-size 1 --epochs 10 --mode train
+```
+
+#### **Slow Training on CPU**
+```bash
+# Optimize CPU training
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
+
+# Use smaller batch size and fewer epochs
+python genconvit.py --data ./data --batch-size 1 --epochs 5 --mode train
+```
+
+#### **Dataset Loading Errors**
+```bash
+# Check data structure
+find ./your_data -name "*.png" | head -10
+ls -la ./your_data/train/real/
+ls -la ./your_data/train/fake/
+```
+
+### **Evaluation Issues**
+
+#### **Model Loading Errors**
+```bash
+# Check model file
+ls -la ./models/
+python -c "import torch; print(torch.load('./model.pth', map_location='cpu').keys())"
+```
+
+#### **Video Processing Errors**
+```bash
+# Check video files
+find ./videos -name "*.mp4" | head -5
+file ./videos/*.mp4
+
+# Reduce frame extraction if needed
+./evaluate.sh --model ./model.pth --video-dir ./videos --max-frames 10
+```
+
+## 📈 **Performance Guidelines**
+
+### **Training Performance by System**
+
+| System Type | Batch Size | Epochs | Expected Time (1000 samples) |
+|-------------|------------|--------|-------------------------------|
+| **4x RTX 4090** | 128 total | 50 | 30 minutes |
+| **2x RTX 3080** | 32 total | 50 | 2 hours |
+| **1x RTX 3060** | 16 | 30 | 4 hours |
+| **1x GTX 1660** | 8 | 20 | 8 hours |
+| **CPU (8 cores)** | 2 | 10 | 24+ hours |
+
+### **Memory Requirements**
+
+| Setup | GPU Memory | System RAM | Disk Space |
+|-------|------------|------------|------------|
+| **Multi-GPU** | 8GB+ per GPU | 16GB+ | 10GB+ |
+| **Single GPU** | 6GB+ | 8GB+ | 5GB+ |
+| **CPU Only** | N/A | 4GB+ | 2GB+ |
+
+## 🎛️ **Advanced Configuration**
+
+### **Custom Model Architecture**
 ```python
-from video_dataset import VideoFrameDataset
-
-dataset = VideoFrameDataset(
-    root_dir="./frames",
-    split="train",
-    frames_per_video=20,
-    random_frame_selection=True
-)
-```
-
-### FrameExtractor
-```python
-from extract_frames import FrameExtractor
-
-extractor = FrameExtractor(
-    input_dir="./videos",
-    output_dir="./frames",
-    frame_interval=5,
-    target_size=(224, 224),
-    face_detection=True
-)
-extractor.extract_all_frames()
-```
-
-### GenConViT Model
-```python
-from genconvit import GenConViT
-
+# Modify in train_ddp.py or genconvit.py
 model = GenConViT(
-    ae_latent=256,
-    vae_latent=256,
-    num_classes=2
+    ae_latent=512,      # AutoEncoder latent dimension
+    vae_latent=512,     # VAE latent dimension
+    num_classes=2       # Number of classes
 )
 ```
 
-## 📄 Citation
+### **Environment Variables for Optimization**
+```bash
+# CPU optimization
+export OMP_NUM_THREADS=4
+export MKL_NUM_THREADS=4
 
-If you use this code in your research, please cite:
+# GPU optimization
+export CUDA_LAUNCH_BLOCKING=0
+```
 
-```bibtex
-@article{genconvit2024,
-  title={GenConViT: Generative Convolutional Vision Transformer for DeepFake Detection},
-  author={[Authors]},
-  journal={[Journal]},
-  year={2024}
+## 📚 **Ground Truth Formats**
+
+### **CSV Format**
+```csv
+video_name,label
+video001,0
+video002,1
+video003,0
+```
+
+### **JSON Format**
+```json
+{
+    "video001": 0,
+    "video002": 1,
+    "video003": 0
 }
 ```
 
-## 🤝 Contributing
+Where: `0 = fake`, `1 = real`
 
+## 🎯 **Best Practices**
+
+### **For Multi-GPU Systems**
+1. Use distributed training with `./launch_ddp.sh`
+2. Start with batch size 16-32 per GPU
+3. Monitor GPU memory usage
+4. Use multiple workers (4-8 per GPU)
+
+### **For Single GPU Systems**
+1. Use `python genconvit.py` directly
+2. Start with batch size 8-16
+3. Enable balanced sampling
+4. Monitor memory usage
+
+### **For CPU-Only Systems**
+1. Use very small batch sizes (1-2)
+2. Reduce number of epochs (5-15)
+3. Use fewer workers (1-2)
+4. Consider using a subset of data for testing
+5. Be patient - CPU training is slow!
+
+### **Data Preparation**
+1. **Balance Dataset**: Equal fake/real samples
+2. **Quality Control**: Remove corrupted frames
+3. **Consistent Naming**: Use clear naming conventions
+4. **Proper Splits**: 70% train, 15% val, 15% test
+
+## 🚀 **Quick Start Checklist**
+
+### **Before Training:**
+- [ ] Data organized in `train/val/{real,fake}` structure
+- [ ] PNG/JPG frame files in appropriate directories
+- [ ] Check if GPU available: `python -c "import torch; print(torch.cuda.is_available())"`
+- [ ] Choose appropriate training command based on your system
+
+### **For Multi-GPU Systems:**
+- [ ] Run: `./launch_ddp.sh --data ./your_data`
+
+### **For Single GPU Systems:**
+- [ ] Run: `python genconvit.py --data ./your_data --mode train`
+
+### **For CPU-Only Systems:**
+- [ ] Run: `CUDA_VISIBLE_DEVICES="" python genconvit.py --data ./your_data --batch-size 1 --mode train`
+
+### **For Evaluation:**
+- [ ] Trained model file (`.pth`)
+- [ ] Video files in a directory
+- [ ] (Optional) Ground truth labels file
+- [ ] Run: `./evaluate.sh --model ./model.pth --video-dir ./videos`
+
+## 🤝 **Support & Contributing**
+
+### **Getting Help**
+1. Check troubleshooting section above
+2. Verify your system meets requirements
+3. Try with smaller dataset first
+4. Create issue with detailed error logs and system specs
+
+### **Contributing**
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
+2. Test on different hardware configurations
+3. Submit pull request with examples
 
-## 📜 License
+## 📄 **License**
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🔗 Related Work
-
-- [FaceForensics++](https://github.com/ondyari/FaceForensics)
-- [ConvNeXt](https://github.com/facebookresearch/ConvNeXt)
-- [Swin Transformer](https://github.com/microsoft/Swin-Transformer)
-- [TIMM Models](https://github.com/rwightman/pytorch-image-models)
-
-## 📞 Support
-
-For questions and support:
-- Create an issue in the repository
-- Check the troubleshooting section
-- Review the examples in the code
+This project is licensed under the MIT License.
 
 ---
 
-**Happy DeepFake Detection! 🎭**
+**🎉 Ready to detect deepfakes?**
+
+- **Multi-GPU?** → `./launch_ddp.sh --help`
+- **Single GPU?** → `python genconvit.py --help` 
+- **CPU only?** → `CUDA_VISIBLE_DEVICES="" python genconvit.py --help`
+- **Evaluation?** → `./evaluate.sh --help`
+
+---
