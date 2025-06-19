@@ -1,0 +1,72 @@
+the model i trained performed very bad
+
+here are the results for my model:
+
+2025-06-19 13:47:45,255 - INFO - Processing video 1/6: 01_02__exit_phone_room__YVGY8LOK.mp4
+2025-06-19 13:47:47,518 - INFO - Extracted 42 frames from 01_02__exit_phone_room__YVGY8LOK.mp4
+2025-06-19 13:47:53,876 - INFO -   Prediction: real (Confidence: 0.997)
+2025-06-19 13:47:53,877 - INFO - Processing video 2/6: 01_02__hugging_happy__YVGY8LOK.mp4
+2025-06-19 13:47:56,670 - INFO - Extracted 50 frames from 01_02__hugging_happy__YVGY8LOK.mp4
+2025-06-19 13:47:57,740 - INFO -   Prediction: real (Confidence: 0.999)
+2025-06-19 13:47:57,740 - INFO - Processing video 3/6: 01_02__meeting_serious__YVGY8LOK.mp4
+2025-06-19 13:48:00,472 - INFO - Extracted 50 frames from 01_02__meeting_serious__YVGY8LOK.mp4
+2025-06-19 13:48:01,498 - INFO -   Prediction: fake (Confidence: 0.744)
+2025-06-19 13:48:01,498 - INFO - Processing video 4/6: 01__exit_phone_room.mp4
+2025-06-19 13:48:04,015 - INFO - Extracted 50 frames from 01__exit_phone_room.mp4
+2025-06-19 13:48:05,002 - INFO -   Prediction: real (Confidence: 0.996)
+2025-06-19 13:48:05,003 - INFO - Processing video 5/6: 01__hugging_happy.mp4
+2025-06-19 13:48:07,727 - INFO - Extracted 50 frames from 01__hugging_happy.mp4
+2025-06-19 13:48:08,838 - INFO -   Prediction: real (Confidence: 0.995)
+2025-06-19 13:48:08,838 - INFO - Processing video 6/6: 01__kitchen_pan.mp4
+2025-06-19 13:48:11,562 - INFO - Extracted 50 frames from 01__kitchen_pan.mp4
+2025-06-19 13:48:12,594 - INFO -   Prediction: real (Confidence: 0.884)
+2025-06-19 13:48:12,595 - INFO - Generating evaluation report...
+2025-06-19 13:48:15,101 - INFO - Evaluation report saved to evaluation_results/evaluation_report.json
+2025-06-19 13:48:15,148 - INFO - Temporary frames cleaned up
+2025-06-19 13:48:15,148 - INFO - ============================================================
+2025-06-19 13:48:15,148 - INFO - EVALUATION SUMMARY
+2025-06-19 13:48:15,148 - INFO - ============================================================
+2025-06-19 13:48:15,148 - INFO - Total videos processed: 6
+2025-06-19 13:48:15,148 - INFO - Successful predictions: 6
+2025-06-19 13:48:15,148 - INFO - Failed predictions: 0
+2025-06-19 13:48:15,148 - INFO - Average confidence: 0.936
+2025-06-19 13:48:15,148 - INFO - Processing time: 29.89 seconds
+2025-06-19 13:48:15,148 - INFO - Results saved to: ./evaluation_results
+
+
+and here are the results from the model authors trained and that is correct:
+
+1 Loading... sample_videos_kaggle/01_02__exit_phone_room__YVGY8LOK.mp4
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:02<00:00,  3.72it/s]
+Prediction: 0.9988697171211243 FAKE 		Fake: 1 Real: 0
+
+
+2 Loading... sample_videos_kaggle/01_02__hugging_happy__YVGY8LOK.mp4
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:02<00:00,  3.64it/s]
+Prediction: 0.9891791939735413 FAKE 		Fake: 2 Real: 0
+
+
+3 Loading... sample_videos_kaggle/01_02__meeting_serious__YVGY8LOK.mp4
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:02<00:00,  3.67it/s]
+Prediction: 0.954308807849884 FAKE 		Fake: 3 Real: 0
+
+
+4 Loading... sample_videos_kaggle/01__exit_phone_room.mp4
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:02<00:00,  3.67it/s]
+Prediction: 0.171927809715271 REAL 		Fake: 3 Real: 1
+
+
+5 Loading... sample_videos_kaggle/01__hugging_happy.mp4
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:02<00:00,  3.64it/s]
+Prediction: 0.26728886365890503 REAL 		Fake: 3 Real: 2
+
+
+6 Loading... sample_videos_kaggle/01__kitchen_pan.mp4
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:02<00:00,  3.62it/s]
+Prediction: 0.1062743067741394 REAL 		Fake: 3 Real: 3
+
+
+BUT THE THING IS:
+- WE HAVE LESS DATA
+- WE TRAINED ON LESS COMPUTE FOR LESS TIME
+- I TRAINED A SINGLE MODEL THEY TRAINED BOTH DIFFERENTLY I THINK THIS JUSTIFIES THIS BUT IT IS A SOLID MODEL NO DOUBT

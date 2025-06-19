@@ -161,7 +161,7 @@ for split in train val; do
 done
 
 # Build command
-CMD="python genconvit-v2/train_ddp.py"
+CMD="python genconvit-v2/training/train_ddp.py"
 CMD="$CMD --data '$DATA_DIR'"
 CMD="$CMD --batch-size $BATCH_SIZE"
 CMD="$CMD --epochs $EPOCHS"

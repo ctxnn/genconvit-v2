@@ -41,114 +41,16 @@ from sklearn.metrics import (
 )
 import timm
 
+# Import our improved models
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from models import GenConViT, load_genconvit_from_checkpoint
+
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Model definitions (same as training script)
-class AutoEncoder(nn.Module):
-    def __init__(self, latent_dim=256):
-        super().__init__()
-        self.enc = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, 1),
-            nn.ReLU(),
-            nn.Conv2d(64, 128, 4, 2, 1),
-            nn.ReLU(),
-            nn.Conv2d(128, 256, 4, 2, 1),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(256*28*28, latent_dim)
-        )
-        self.dec = nn.Sequential(
-            nn.Linear(latent_dim, 256*28*28),
-            nn.Unflatten(1, (256, 28, 28)),
-            nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),
-            nn.Sigmoid()
-        )
-
-    def forward(self, x):
-        z = self.enc(x)
-        return self.dec(z)
-
-class VariationalAutoEncoder(nn.Module):
-    def __init__(self, latent_dim=256):
-        super().__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(3, 64, 4, 2, 1),
-            nn.ReLU(),
-            nn.Conv2d(64, 128, 4, 2, 1),
-            nn.ReLU(),
-            nn.Conv2d(128, 256, 4, 2, 1),
-            nn.ReLU(),
-            nn.Flatten()
-        )
-        self.fc_mu = nn.Linear(256*28*28, latent_dim)
-        self.fc_logvar = nn.Linear(256*28*28, latent_dim)
-        self.dec_fc = nn.Linear(latent_dim, 256*28*28)
-        self.dec_conv = nn.Sequential(
-            nn.Unflatten(1, (256, 28, 28)),
-            nn.ReLU(),
-            nn.ConvTranspose2d(256, 128, 4, 2, 1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(128, 64, 4, 2, 1),
-            nn.ReLU(),
-            nn.ConvTranspose2d(64, 3, 4, 2, 1),
-            nn.Sigmoid()
-        )
-
-    def reparameterize(self, mu, logvar):
-        std = torch.exp(0.5 * logvar)
-        eps = torch.randn_like(std)
-        return mu + eps * std
-
-    def forward(self, x):
-        h = self.conv(x)
-        mu = self.fc_mu(h)
-        logvar = self.fc_logvar(h)
-        z = self.reparameterize(mu, logvar)
-        out = self.dec_conv(self.dec_fc(z))
-        return out, mu, logvar
-
-class GenConViT(nn.Module):
-    def __init__(self, ae_latent=256, vae_latent=256, num_classes=2):
-        super().__init__()
-        self.ae = AutoEncoder(ae_latent)
-        self.vae = VariationalAutoEncoder(vae_latent)
-        self.convnext = timm.create_model('convnext_tiny', pretrained=True, num_classes=0)
-        self.swin = timm.create_model('swin_tiny_patch4_window7_224', pretrained=True, num_classes=0)
-        feat_dim = self.convnext.num_features
-
-        self.head_a = nn.Sequential(
-            nn.Linear(feat_dim + ae_latent, 256),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(256, num_classes)
-        )
-        self.head_b = nn.Sequential(
-            nn.Linear(feat_dim + vae_latent, 256),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(256, num_classes)
-        )
-
-    def forward(self, x):
-        ia = self.ae(x)
-        fa1 = self.convnext(ia)
-        fa2 = self.swin(ia)
-        la = self.head_a(torch.cat([fa1, self.ae.enc(x)], dim=1))
-
-        ib, mu, logvar = self.vae(x)
-        fb1 = self.convnext(ib)
-        fb2 = self.swin(ib)
-        lb = self.head_b(torch.cat([fb1, self.vae.fc_mu(self.vae.conv(x))], dim=1))
-
-        logits = la + lb
-        return logits, la, lb, mu, logvar
+# Model definitions are now imported from models module
 
 class VideoFrameExtractor:
     """Extract frames from video files"""
@@ -239,23 +141,19 @@ class ModelPredictor:
 
     def _load_model(self, model_path: str) -> nn.Module:
         logger.info(f"Loading model from {model_path}")
+        
+        # Use the improved model loading function
+        model = load_genconvit_from_checkpoint(
+            model_path, 
+            map_location=str(self.device)
+        )
+        
+        # Get class names from checkpoint
         checkpoint = torch.load(model_path, map_location=self.device)
-
-        # Determine number of classes
         if 'class_names' in checkpoint:
-            num_classes = len(checkpoint['class_names'])
             self.class_names = checkpoint['class_names']
         else:
-            num_classes = 2
             self.class_names = ['fake', 'real']
-
-        # Create and load model
-        model = GenConViT(num_classes=num_classes)
-
-        if 'model_state_dict' in checkpoint:
-            model.load_state_dict(checkpoint['model_state_dict'])
-        else:
-            model.load_state_dict(checkpoint)
 
         model = model.to(self.device)
         model.eval()

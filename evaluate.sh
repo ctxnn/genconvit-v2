@@ -245,7 +245,7 @@ echo "Videos to process:    $VIDEO_COUNT"
 echo "========================================================"
 
 # Build command
-CMD="python genconvit-v2/predict_and_evaluate.py"
+CMD="python genconvit-v2/evaluation/predict_and_evaluate.py"
 CMD="$CMD --model '$MODEL_PATH'"
 CMD="$CMD --video-dir '$VIDEO_DIR'"
 CMD="$CMD --output-dir '$OUTPUT_DIR'"
