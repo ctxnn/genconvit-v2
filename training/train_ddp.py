@@ -26,6 +26,7 @@ from typing import Dict, Any, Tuple
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -146,6 +147,11 @@ def train_epoch(model: DDP,
             vae_beta=config['vae_beta']
         )
 
+        # Add regularization for individual path losses to ensure all parameters are used
+        path_a_loss = F.cross_entropy(logits_a, labels)
+        path_b_loss = F.cross_entropy(logits_b, labels)
+        loss = loss + 0.1 * path_a_loss + 0.1 * path_b_loss
+
         # Backward pass
         loss.backward()
 
@@ -221,6 +227,11 @@ def validate_epoch(model: DDP,
                 vae_weight=config['vae_weight'],
                 vae_beta=config['vae_beta']
             )
+
+            # Add regularization for individual path losses to ensure all parameters are used
+            path_a_loss = F.cross_entropy(logits_a, labels)
+            path_b_loss = F.cross_entropy(logits_b, labels)
+            loss = loss + 0.1 * path_a_loss + 0.1 * path_b_loss
 
             # Statistics
             total_loss += loss.item()
@@ -328,7 +339,7 @@ def train_ddp(rank: int, world_size: int, args):
     model = model.to(device)
 
     # Wrap model with DDP
-    model = DDP(model, device_ids=[rank], output_device=rank, find_unused_parameters=False)
+    model = DDP(model, device_ids=[rank], output_device=rank, find_unused_parameters=True)
 
     # Create optimizer with weight decay
     optimizer = optim.AdamW(
@@ -429,11 +440,11 @@ def train_ddp(rank: int, world_size: int, args):
 
                 logging.info(f"New best model saved: {best_path}")
                 logging.info(f"Timestamped best model saved: {timestamped_path}")
-            
+
             # Save periodic checkpoint
             if epoch % args.save_every == 0:
                 checkpoint_path = f"models/genconvit_v2_ddp_epoch_{epoch}.pth"
-                save_checkpoint(model, optimizer, scheduler, epoch, best_acc, 
+                save_checkpoint(model, optimizer, scheduler, epoch, best_acc,
                               checkpoint_path, train_dataset.class_names, config, history)
                 logging.info(f"Periodic checkpoint saved: {checkpoint_path}")
 
