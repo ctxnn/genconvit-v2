@@ -70,12 +70,13 @@ class ClassificationOnlyTrainer:
         self.device = device
         self.config = config
         
-        # Simple Adam optimizer
+        # Conservative optimizer to prevent gradient explosion
         self.optimizer = optim.Adam(
             self.model.parameters(),
             lr=config['learning_rate'],
             weight_decay=config['weight_decay'],
-            eps=1e-8
+            eps=1e-8,
+            betas=(0.9, 0.999)
         )
         
         # Learning rate scheduler
@@ -136,12 +137,14 @@ class ClassificationOnlyTrainer:
             # Backward pass
             loss.backward()
             
-            # Gradient clipping
-            grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            # Very aggressive gradient clipping
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.1)
             
-            # Check gradients
-            if grad_norm > 10.0:
-                logger.warning(f"Large gradient norm: {grad_norm:.4f}")
+            # Check gradients and skip if still too large
+            if grad_norm > 1.0:
+                logger.warning(f"Large gradient norm: {grad_norm:.4f}, skipping step")
+                self.optimizer.zero_grad()
+                continue
             
             self.optimizer.step()
             
@@ -356,16 +359,16 @@ def main():
                        help='AutoEncoder latent dimension (default: 256)')
     parser.add_argument('--vae-latent', type=int, default=256,
                        help='VAE latent dimension (default: 256)')
-    parser.add_argument('--dropout-rate', type=float, default=0.3,
-                       help='Dropout rate (default: 0.3)')
+    parser.add_argument('--dropout-rate', type=float, default=0.1,
+                       help='Dropout rate (default: 0.1)')
     
     # Training arguments
     parser.add_argument('--epochs', type=int, default=50,
                        help='Number of training epochs (default: 50)')
-    parser.add_argument('--lr', type=float, default=0.001,
-                       help='Learning rate (default: 0.001)')
-    parser.add_argument('--weight-decay', type=float, default=1e-4,
-                       help='Weight decay for regularization (default: 1e-4)')
+    parser.add_argument('--lr', type=float, default=0.0001,
+                       help='Learning rate (default: 0.0001)')
+    parser.add_argument('--weight-decay', type=float, default=1e-5,
+                       help='Weight decay for regularization (default: 1e-5)')
     
     # Early stopping arguments
     parser.add_argument('--early-stopping-patience', type=int, default=10,
