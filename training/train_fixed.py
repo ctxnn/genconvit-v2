@@ -68,19 +68,52 @@ def simplified_loss(logits: torch.Tensor,
     # Classification loss (main focus)
     cls_loss = F.cross_entropy(logits, targets)
     
-    # Reconstruction losses (minimal weight)
-    ae_recon_loss = F.mse_loss(ae_reconstructed, original)
+    # Check for NaN in classification loss
+    if torch.isnan(cls_loss):
+        logger.error("NaN detected in classification loss!")
+        cls_loss = torch.tensor(0.0, device=logits.device, requires_grad=True)
     
-    # VAE loss components
-    vae_recon_loss = F.mse_loss(vae_reconstructed, original)
-    kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-    kl_loss = kl_loss / (original.size(0) * original.size(1) * original.size(2) * original.size(3))
+    # Reconstruction losses (minimal weight) with stability checks
+    ae_recon_loss = F.mse_loss(ae_reconstructed, original, reduction='mean')
+    if torch.isnan(ae_recon_loss):
+        logger.warning("NaN detected in AE reconstruction loss, setting to 0")
+        ae_recon_loss = torch.tensor(0.0, device=original.device, requires_grad=True)
+    
+    # VAE loss components with numerical stability
+    vae_recon_loss = F.mse_loss(vae_reconstructed, original, reduction='mean')
+    if torch.isnan(vae_recon_loss):
+        logger.warning("NaN detected in VAE reconstruction loss, setting to 0")
+        vae_recon_loss = torch.tensor(0.0, device=original.device, requires_grad=True)
+    
+    # Stabilized KL divergence calculation
+    # Clamp logvar to prevent extreme values
+    logvar_clamped = torch.clamp(logvar, min=-10.0, max=10.0)
+    mu_clamped = torch.clamp(mu, min=-10.0, max=10.0)
+    
+    # KL loss with numerical stability
+    kl_loss = -0.5 * torch.mean(1 + logvar_clamped - mu_clamped.pow(2) - logvar_clamped.exp())
+    
+    # Additional stability check for KL loss
+    if torch.isnan(kl_loss) or torch.isinf(kl_loss):
+        logger.warning("NaN/Inf detected in KL loss, setting to 0")
+        kl_loss = torch.tensor(0.0, device=mu.device, requires_grad=True)
+    
     vae_total_loss = vae_recon_loss + vae_beta * kl_loss
+    
+    # Final stability check
+    if torch.isnan(vae_total_loss):
+        logger.warning("NaN detected in VAE total loss, using only reconstruction")
+        vae_total_loss = vae_recon_loss
     
     # Combined loss with heavy emphasis on classification
     total_loss = (classification_weight * cls_loss + 
                   ae_weight * ae_recon_loss + 
                   vae_weight * vae_total_loss)
+    
+    # Final NaN check
+    if torch.isnan(total_loss):
+        logger.error("NaN detected in total loss! Using only classification loss.")
+        total_loss = classification_weight * cls_loss
     
     # Loss dictionary for monitoring
     loss_dict = {
@@ -145,12 +178,14 @@ class FixedTrainer:
         self.device = device
         self.config = config
         
-        # Optimizer with higher learning rate
+        # Optimizer with higher learning rate and stability improvements
         self.optimizer = optim.AdamW(
             self.model.parameters(),
             lr=config['learning_rate'],
             weight_decay=config['weight_decay'],
-            betas=(0.9, 0.999)
+            betas=(0.9, 0.999),
+            eps=1e-8,  # Numerical stability
+            amsgrad=True  # More stable variant
         )
         
         # Learning rate scheduler - less aggressive
@@ -225,15 +260,24 @@ class FixedTrainer:
             )
             
             # Check for NaN before backward pass
-            if torch.isnan(loss):
-                logger.error(f"NaN loss detected at batch {batch_idx}! Skipping batch.")
+            if torch.isnan(loss) or torch.isinf(loss):
+                logger.error(f"NaN/Inf loss detected at batch {batch_idx}!")
+                logger.error(f"Loss components - Cls: {loss_dict['classification_loss']:.6f}, "
+                           f"AE: {loss_dict['ae_reconstruction_loss']:.6f}, "
+                           f"VAE: {loss_dict['vae_loss']:.6f}, "
+                           f"KL: {loss_dict['kl_loss']:.6f}")
+                # Skip this batch
                 continue
             
             # Backward pass
             loss.backward()
             
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            # Gradient clipping with more aggressive bounds
+            grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
+            
+            # Check for gradient explosion
+            if grad_norm > 10.0:
+                logger.warning(f"Large gradient norm detected: {grad_norm:.4f}")
             
             self.optimizer.step()
             
